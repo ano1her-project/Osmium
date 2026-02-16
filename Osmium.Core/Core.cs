@@ -2,13 +2,12 @@
 {
     public class Vector2
     {
-        public int x;
-        public int y;
+        public int file, rank; // which file = x, which rank = y
 
-        public Vector2(int p_x, int p_y)
+        public Vector2(int p_file, int p_rank)
         {
-            x = p_x;
-            y = p_y;
+            file = p_file;
+            rank = p_rank;
         }
 
         public static readonly Vector2 up = new(0, 1);
@@ -22,13 +21,25 @@
         public static readonly Vector2[] hippogonalDirections = [new(1, 2), new(2, 1), new(2, -1), new(1, -2), new(-1, -2), new(-2, -1), new(-2, 1), new(-1, 2)];
 
         public static Vector2 operator +(Vector2 a, Vector2 b)
-            => new(a.x + b.x, a.y + b.y);
+            => new(a.file + b.file, a.rank + b.rank);
 
         public static Vector2 operator -(Vector2 a, Vector2 b)
-            => new(a.x - b.x, a.y - b.y);
+            => new(a.file - b.file, a.rank - b.rank);
+
+        public static bool operator ==(Vector2 a, Vector2 b)
+            => a.file == b.file && a.rank == b.rank;
+
+        public static bool operator !=(Vector2 a, Vector2 b)
+            => !(a == b);
+
+        public Vector2 DeepCopy()
+            => new(file, rank);
+
+        public static Vector2 FromString(string str) // assuming a string in the format of e4 (for example)
+            => new(str[0] - 'a', str[1] - '0' - 1);
 
         public override string ToString()
-            => $"({x}, {y})";
+            => (char)('a' + file) + (rank + 1).ToString();
     }
 
     public class Piece
@@ -66,6 +77,15 @@
                 _ => throw new Exception(),
             };
         }
+
+        public static bool operator ==(Piece a, Piece b)
+            => a.type == b.type && a.isWhite == b.isWhite;
+
+        public static bool operator !=(Piece a, Piece b)
+            => !(a == b);
+
+        public Piece DeepCopy()
+            => new(type, isWhite);
     }
 
     public class Position
@@ -76,12 +96,20 @@
         int halfmoveClock;
         int fullmoves;
 
+        public Position(Piece?[,] p_board, bool p_whiteToMove, Vector2? p_enPassantSquare, int p_halfmoveClock, int p_fullmoves)
+        {
+            board = p_board;
+            whiteToMove = p_whiteToMove;
+            enPassantSquare = p_enPassantSquare;
+            halfmoveClock = p_halfmoveClock;
+            fullmoves = p_fullmoves;
+        }
+
         public static Position FromFEN(string fen)
         {
-            Position result = new();
-            //
             var fields = fen.Split(' ');
-            // 0th field = piece placement data
+            // 0th (1st) field = piece placement data
+            Piece?[,] board = new Piece?[8, 8];
             var ranks = fields[0].Split('/');
             for (int rank = 0; rank < 8; rank++)
             {
@@ -93,13 +121,58 @@
                         file += ch - '0'; // effectively converts ch to an int
                     else
                     {
-                        result.board[rank, file] = Piece.FromChar(ch);
+                        board[rank, file] = Piece.FromChar(ch);
                         file++;
                     }
                 }
             }
+            // 1st (2nd) field = active color
+            bool whiteToMove = fields[1] == "w";
+            // 2nd (3rd) field = castling availability
+
+            // 3rd (4th) field = en passant target square
+            Vector2? enPassantSquare = fields[3] == "-" ? null : Vector2.FromString(fields[3]);
+            // 4th (5th) field = halfmove clock used for the fifty move rule
+            int halfmoveClock = int.Parse(fields[4]);
+            // 5th (6th) field = fullmove number
+            int fullmoves = int.Parse(fields[5]);
             //
-            return result;
+            return new(board, whiteToMove, enPassantSquare, halfmoveClock, fullmoves);
+        }
+
+        public Position DeepCopy()
+        {
+            Piece?[,] newBoard = new Piece?[8, 8];
+            for (int rank = 0; rank < 8; rank++)
+            {
+                for (int file = 0; file < 8; file++)
+                    newBoard[rank, file] = board[rank, file];
+            }
+            bool newWhiteToMove = whiteToMove;
+            Vector2? newEnPassantSquare = enPassantSquare is null ? null : enPassantSquare.DeepCopy();
+            int newHalfmoveClock = halfmoveClock;
+            int newFullmoves = fullmoves;
+            return new(newBoard, newWhiteToMove, newEnPassantSquare, newHalfmoveClock, newFullmoves);
+        }
+
+        public void MakeMove(Move move)
+        {
+            var piece = board[move.from.rank, move.from.file];
+            if (piece is null)
+                return; // just pack it up man
+            board[move.from.rank, move.from.file] = null;
+            board[move.to.rank, move.to.file] = piece.DeepCopy();
+        }
+    }
+
+    public class Move
+    {
+        public Vector2 from, to;
+
+        public Move(Vector2 p_from, Vector2 p_to)
+        {
+            from = p_from;
+            to = p_to;
         }
     }
 }
