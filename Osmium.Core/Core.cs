@@ -36,12 +36,6 @@
         public Type type;
         public bool isWhite;
 
-        public Piece(Type p_type, bool p_isWhite)
-        {
-            type = p_type;
-            isWhite = p_isWhite;
-        }
-
         public enum Type
         {
             Pawn,
@@ -50,6 +44,27 @@
             Rook,
             Queen,
             King
+        }
+
+        public Piece(Type p_type, bool p_isWhite)
+        {
+            type = p_type;
+            isWhite = p_isWhite;
+        }      
+        
+        public static Piece FromChar(char ch)
+        {
+            bool isWhite = char.IsUpper(ch);
+            return char.ToLower(ch) switch
+            {
+                'p' => new(Type.Pawn, isWhite),
+                'b' => new(Type.Bishop, isWhite),
+                'n' => new(Type.Knight, isWhite),
+                'r' => new(Type.Rook, isWhite),
+                'q' => new(Type.Queen, isWhite),
+                'k' => new(Type.King, isWhite),
+                _ => throw new Exception(),
+            };
         }
     }
 
@@ -61,8 +76,10 @@
         int halfmoveClock;
         int fullmoves;
 
-        public Position(string fen)
+        public static Position FromFEN(string fen)
         {
+            Position result = new();
+            //
             var fields = fen.Split(' ');
             // 0th field = piece placement data
             var ranks = fields[0].Split('/');
@@ -72,9 +89,17 @@
                 int file = 0;
                 foreach (var ch in chars)
                 {
-
+                    if (char.IsDigit(ch))
+                        file += ch - '0'; // effectively converts ch to an int
+                    else
+                    {
+                        result.board[rank, file] = Piece.FromChar(ch);
+                        file++;
+                    }
                 }
             }
+            //
+            return result;
         }
     }
 }
