@@ -36,7 +36,7 @@ namespace Osmium.Tests
                 {
                     string squareName = (char)('a' + file) + (rank + 1).ToString();
                     var v = new Vector2(file, rank);
-                    Assert.Equal(v.ToString(), squareName);
+                    Assert.Equal(squareName, v.ToString());
                 }
             }
         }
@@ -69,8 +69,14 @@ namespace Osmium.Tests
             for (int i = 0; i < options.Length; i++)
             {
                 var c = Position.CastlingRightsFromString(options[i]);
-                Assert.Equal((int)c, i);
+                Assert.Equal(i, (int)c);
             }
+        }
+
+        [Fact]
+        public void StartingPositionToFen()
+        {
+            Assert.Equal("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", Position.startingPosition.ToFEN());
         }
     }
 }

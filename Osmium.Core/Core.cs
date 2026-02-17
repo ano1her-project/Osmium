@@ -159,6 +159,8 @@
             fullmoves = p_fullmoves;
         }
 
+        public static readonly Position startingPosition = FromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+
         public static Position FromFEN(string fen)
         {
             var fields = fen.Split(' ');
@@ -230,6 +232,7 @@
                         output += board[rank, file].ToString();
                     }
                 }
+                output += consecutiveEmptySquares == 0 ? "" : consecutiveEmptySquares.ToString();
                 output += rank == 7 ? " " : "/";
             }
             // 1st (2nd) field = active color
