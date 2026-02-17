@@ -74,7 +74,7 @@
                 'r' => new(Type.Rook, isWhite),
                 'q' => new(Type.Queen, isWhite),
                 'k' => new(Type.King, isWhite),
-                _ => throw new Exception(),
+                _ => throw new Exception()
             };
         }
 
@@ -83,6 +83,24 @@
 
         public static bool operator !=(Piece a, Piece b)
             => !(a == b);
+
+        public char ToChar()
+        {
+            char ch = type switch
+            {
+                Type.Pawn => 'p',
+                Type.Bishop => 'b',
+                Type.Knight => 'n',
+                Type.Rook => 'r',
+                Type.Queen => 'q',
+                Type.King => 'k',
+                _ => throw new Exception()
+            };
+            return isWhite ? char.ToUpper(ch) : ch;
+        }
+
+        public override string ToString()
+            => ToChar().ToString();
 
         public Piece DeepCopy()
             => new(type, isWhite);
@@ -104,6 +122,31 @@
             WhiteQueenside = 2,
             BlackKingside = 4,
             BlackQueenside = 8
+        }
+
+        public static CastlingAvailability CastlingRightsFromString(string str)
+        {
+            var output = CastlingAvailability.None;
+            if (str == "-")
+                return output;
+            foreach (var ch in str.ToCharArray())
+            {
+                output |= ch switch
+                {
+                    'K' => CastlingAvailability.WhiteKingside,
+                    'Q' => CastlingAvailability.WhiteQueenside,
+                    'k' => CastlingAvailability.BlackKingside,
+                    'q' => CastlingAvailability.BlackQueenside,
+                    _ => throw new Exception(),
+                };
+            }
+            return output;
+        }
+
+        public static string CastlingRightsToString(CastlingAvailability castlingAvailability)
+        {
+            string[] options = ["-", "K", "Q", "KQ", "k", "Kk", "Qk", "KQk", "q", "Kq", "Qq", "KQq", "kq", "Kkq", "Qkq", "KQkq"];
+            return options[(int)castlingAvailability];
         }
 
         public Position(Piece?[,] p_board, bool p_whiteToMove, CastlingAvailability p_castlingAvailability, Vector2? p_enPassantSquare, int p_halfmoveClock, int p_fullmoves)
@@ -150,25 +193,6 @@
             return new(board, whiteToMove, castlingAvailability, enPassantSquare, halfmoveClock, fullmoves);
         }
 
-        public static CastlingAvailability CastlingRightsFromString(string str)
-        {
-            var output = CastlingAvailability.None;
-            if (str == "-")
-                return output;
-            foreach (var ch in str.ToCharArray())
-            {
-                output |= ch switch
-                {
-                    'K' => CastlingAvailability.WhiteKingside,
-                    'Q' => CastlingAvailability.WhiteQueenside,
-                    'k' => CastlingAvailability.BlackKingside,
-                    'q' => CastlingAvailability.BlackQueenside,
-                    _ => throw new Exception(),
-                };
-            }
-            return output;
-        }
-
         public Position DeepCopy()
         {
             Piece?[,] newBoard = new Piece?[8, 8];
@@ -183,6 +207,43 @@
             int newHalfmoveClock = halfmoveClock;
             int newFullmoves = fullmoves;
             return new(newBoard, newWhiteToMove, newCastlingAvailability, newEnPassantSquare, newHalfmoveClock, newFullmoves);
+        }
+
+        public override string ToString()
+            => ToFEN();
+
+        public string ToFEN()
+        {
+            string output = "";
+            // 0th (1st) field = piece placement data
+            for (int rank = 0; rank < 8; rank++)
+            {
+                int consecutiveEmptySquares = 0;
+                for (int file = 0; file < 8; file++)
+                {
+                    if (board[rank, file] is null)
+                        consecutiveEmptySquares++;
+                    else
+                    {
+                        if (consecutiveEmptySquares != 0)
+                            output += consecutiveEmptySquares.ToString();
+                        output += board[rank, file].ToString();
+                    }
+                }
+                output += rank == 7 ? " " : "/";
+            }
+            // 1st (2nd) field = active color
+            output += (whiteToMove ? "w" : "b") + " ";
+            // 2nd (3rd) field = castling availability
+            output += CastlingRightsToString(castlingAvailability) + " ";
+            // 3rd (4th) field = en passant target square
+            output += (enPassantSquare is null ? "-" : enPassantSquare.ToString()) + " ";
+            // 4th (5th) field = halfmove clock used for the fifty move rule
+            output += halfmoveClock.ToString() + " ";
+            // 5th (6th) field = fullmove number
+            output += fullmoves.ToString();
+            //
+            return output;
         }
 
         public void MakeMove(Move move)
