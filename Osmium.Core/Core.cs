@@ -92,14 +92,25 @@
     {
         Piece?[,] board = new Piece?[8, 8];
         bool whiteToMove;
+        CastlingAvailability castlingAvailability;
         Vector2? enPassantSquare;
         int halfmoveClock;
         int fullmoves;
 
-        public Position(Piece?[,] p_board, bool p_whiteToMove, Vector2? p_enPassantSquare, int p_halfmoveClock, int p_fullmoves)
+        [Flags] public enum CastlingAvailability : byte
+        {
+            None = 0,
+            WhiteKingside = 1,
+            WhiteQueenside = 2,
+            BlackKingside = 4,
+            BlackQueenside = 8
+        }
+
+        public Position(Piece?[,] p_board, bool p_whiteToMove, CastlingAvailability p_castlingAvailability, Vector2? p_enPassantSquare, int p_halfmoveClock, int p_fullmoves)
         {
             board = p_board;
             whiteToMove = p_whiteToMove;
+            castlingAvailability = p_castlingAvailability;
             enPassantSquare = p_enPassantSquare;
             halfmoveClock = p_halfmoveClock;
             fullmoves = p_fullmoves;
@@ -113,9 +124,8 @@
             var ranks = fields[0].Split('/');
             for (int rank = 0; rank < 8; rank++)
             {
-                var chars = ranks[rank].ToCharArray();
                 int file = 0;
-                foreach (var ch in chars)
+                foreach (var ch in ranks[rank].ToCharArray())
                 {
                     if (char.IsDigit(ch))
                         file += ch - '0'; // effectively converts ch to an int
@@ -129,7 +139,7 @@
             // 1st (2nd) field = active color
             bool whiteToMove = fields[1] == "w";
             // 2nd (3rd) field = castling availability
-
+            var castlingAvailability = CastlingRightsFromString(fields[2]);
             // 3rd (4th) field = en passant target square
             Vector2? enPassantSquare = fields[3] == "-" ? null : Vector2.FromString(fields[3]);
             // 4th (5th) field = halfmove clock used for the fifty move rule
@@ -137,7 +147,26 @@
             // 5th (6th) field = fullmove number
             int fullmoves = int.Parse(fields[5]);
             //
-            return new(board, whiteToMove, enPassantSquare, halfmoveClock, fullmoves);
+            return new(board, whiteToMove, castlingAvailability, enPassantSquare, halfmoveClock, fullmoves);
+        }
+
+        public static CastlingAvailability CastlingRightsFromString(string str)
+        {
+            var output = CastlingAvailability.None;
+            if (str == "-")
+                return output;
+            foreach (var ch in str.ToCharArray())
+            {
+                output |= ch switch
+                {
+                    'K' => CastlingAvailability.WhiteKingside,
+                    'Q' => CastlingAvailability.WhiteQueenside,
+                    'k' => CastlingAvailability.BlackKingside,
+                    'q' => CastlingAvailability.BlackQueenside,
+                    _ => throw new Exception(),
+                };
+            }
+            return output;
         }
 
         public Position DeepCopy()
@@ -149,10 +178,11 @@
                     newBoard[rank, file] = board[rank, file];
             }
             bool newWhiteToMove = whiteToMove;
+            var newCastlingAvailability = castlingAvailability;
             Vector2? newEnPassantSquare = enPassantSquare is null ? null : enPassantSquare.DeepCopy();
             int newHalfmoveClock = halfmoveClock;
             int newFullmoves = fullmoves;
-            return new(newBoard, newWhiteToMove, newEnPassantSquare, newHalfmoveClock, newFullmoves);
+            return new(newBoard, newWhiteToMove, newCastlingAvailability, newEnPassantSquare, newHalfmoveClock, newFullmoves);
         }
 
         public void MakeMove(Move move)
@@ -163,6 +193,7 @@
             board[move.from.rank, move.from.file] = null;
             board[move.to.rank, move.to.file] = piece.DeepCopy();
         }
+
     }
 
     public class Move
