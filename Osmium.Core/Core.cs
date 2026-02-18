@@ -108,7 +108,7 @@
 
     public class Position
     {
-        Piece?[,] board = new Piece?[8, 8];
+        public Piece?[,] board = new Piece?[8, 8];
         bool whiteToMove;
         CastlingAvailability castlingAvailability;
         Vector2? enPassantSquare;
