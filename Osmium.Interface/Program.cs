@@ -6,16 +6,15 @@ namespace Osmium.Interface
     {
         static void Main()
         {
-            WaitForCommandAndReact();
+            PregameLoop();
         }
 
-        static void WaitForCommandAndReact()
+        static void PregameLoop()
         {
             string input = Console.ReadLine();
             switch (input)
             {
                 default:
-                    WaitForCommandAndReact();
                     break;
             }
         }
@@ -60,7 +59,7 @@ namespace Osmium.Interface
             {
                 for (int file = 0; file < 8; file++)
                 {
-                    if (position.board[rank, file] is null)
+                    if (position.GetPiece(rank, file) is null)
                         output += backgroundOptions switch
                         {
                             BackgroundOptions.Simple => ". ",
@@ -71,9 +70,9 @@ namespace Osmium.Interface
                     else
                         output += "." + pieceOptions switch
                         {
-                            PieceOptions.Ascii => position.board[rank, file].ToString(),
-                            PieceOptions.Unicode => unicodePieces[position.board[rank, file].ToChar()],
-                            PieceOptions.UnicodeInverted => unicodePieces[new Piece(position.board[rank, file].type, !position.board[rank, file].isWhite).ToChar()],
+                            PieceOptions.Ascii => position.GetPiece(rank, file)?.ToString(),
+                            PieceOptions.Unicode => unicodePieces[position.GetPiece(rank, file).ToChar()],
+                            PieceOptions.UnicodeInverted => unicodePieces[new Piece(position.GetPiece(rank, file).type, !position.GetPiece(rank, file).isWhite).ToChar()],
                             _ => throw new Exception()
                         };
                 }
@@ -86,6 +85,6 @@ namespace Osmium.Interface
             => (rank + file) % 2 != 0;
 
         static string GetSquareShadeString(int rank, int file, bool invert)
-            => IsSquareWhite(rank, file) ? "░░" : "▒▒";
+            => (IsSquareWhite(rank, file) ^ invert) ? "░░" : "▒▒";
     }
 }

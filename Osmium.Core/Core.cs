@@ -201,7 +201,7 @@
             for (int rank = 0; rank < 8; rank++)
             {
                 for (int file = 0; file < 8; file++)
-                    newBoard[rank, file] = board[rank, file];
+                    newBoard[rank, file] = GetPiece(rank, file)?.DeepCopy();
             }
             bool newWhiteToMove = whiteToMove;
             var newCastlingAvailability = castlingAvailability;
@@ -223,13 +223,13 @@
                 int consecutiveEmptySquares = 0;
                 for (int file = 0; file < 8; file++)
                 {
-                    if (board[rank, file] is null)
+                    if (GetPiece(rank, file) is null)
                         consecutiveEmptySquares++;
                     else
                     {
                         if (consecutiveEmptySquares != 0)
                             output += consecutiveEmptySquares.ToString();
-                        output += board[rank, file].ToString();
+                        output += GetPiece(rank, file)?.ToString();
                     }
                 }
                 output += consecutiveEmptySquares == 0 ? "" : consecutiveEmptySquares.ToString();
@@ -249,15 +249,33 @@
             return output;
         }
 
+        public Piece? GetPiece(int rank, int file)
+            => board[rank, file];
+
+        public Piece? GetPiece(Vector2 v)
+            => GetPiece(v.rank, v.file);
+
+        public void SetPiece(int rank, int file, Piece? piece)
+            => board[rank, file] = piece is null ? null : piece.DeepCopy();
+
+        public void SetPiece(Vector2 v, Piece? piece)
+            => SetPiece(v.rank, v.file, piece);
+
         public void MakeMove(Move move)
         {
-            var piece = board[move.from.rank, move.from.file];
+            var piece = GetPiece(move.from);
             if (piece is null)
                 return; // just pack it up man
-            board[move.from.rank, move.from.file] = null;
-            board[move.to.rank, move.to.file] = piece.DeepCopy();
+            SetPiece(move.from, null);
+            SetPiece(move.to, piece);
         }
 
+        // move generation and move legality:
+
+        public bool IsPieceCheckingKing(int rank, int file)
+        {
+            var piece = GetPiece(rank, file);
+        }
     }
 
     public class Move
