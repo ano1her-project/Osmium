@@ -374,6 +374,37 @@ namespace Osmium.Core
             Vector2 displacement = king - attacker;
             return Math.Abs(displacement.rank) <= 1 && Math.Abs(displacement.file) <= 1;
         }
+
+        bool IsKingInCheck(bool kingColor)
+        {
+            // find king
+            Vector2 king = -Vector2.one;
+            Piece kingPiece = new(Piece.Type.King, kingColor);
+            for (int rank = kingColor ? 0 : 7; rank >= 0 && rank < 8; rank += kingColor ? 1 : -1)
+            {
+                for (int file = 0; file < 8; file++)
+                {
+                    Piece? piece = GetPiece(rank, file);
+                    if (piece is not null && piece == kingPiece)
+                        king = new(file, rank);
+                }
+            }
+            if (king == -Vector2.one)
+                throw new Exception();
+            //
+            for (int rank = 0; rank < 8; rank++)
+            {
+                for (int file = 0; file < rank; file++)
+                {
+                    Piece? piece = GetPiece(rank, file);
+                    if (piece is null || piece.isWhite == kingColor)
+                        continue; // nothing worth examining rn on this square
+                    if (IsPieceCheckingKing(new(rank, file), king))
+                        return true;
+                }
+            }
+            return false;
+        }
     }
 
     public class Move
