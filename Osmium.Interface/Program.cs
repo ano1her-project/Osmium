@@ -6,12 +6,10 @@ namespace Osmium.Interface
     {
         static void Main()
         {
-            PrettyPrinter.Print(Position.startingPosition);
-            PrettyPrinter.Print(Position.FromFEN("k7/8/8/8/8/8/8/R6K w - - 0 1"));
-            PregameLoop();
+            CommandLoop();
         }
 
-        static void PregameLoop()
+        static void CommandLoop()
         {
             string input = Console.ReadLine();
             switch (input)

@@ -137,6 +137,39 @@ namespace Osmium.Tests
             Assert.True(position.IsPieceCheckingKing(attacker, king));
             attacker = new(4, 4);
             Assert.True(position.IsPieceCheckingKing(attacker, king));
+            //
+            position = Position.FromFEN("8/8/6k1/7P/7K/8/8/8 w - - 0 1");
+            attacker = new(7, 4);
+            king = new(6, 5);
+            Assert.True(position.IsPieceCheckingKing(attacker, king));
+            //
+            position = Position.FromFEN("r1bqkbnr/ppppp1pp/2n2p2/7Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 2 2");
+            attacker = new(7, 4);
+            king = new(4, 7);
+            Assert.True(position.IsPieceCheckingKing(attacker, king));
+        }
+
+        [Fact]
+        public void IsKingInCheck_Samples()
+        {
+            var position = Position.FromFEN("r1bqkbnr/ppppp1pp/2n2p2/7Q/4P3/8/PPPP1PPP/RNB1KBNR w KQkq - 3 3");
+            Assert.True(position.IsKingInCheck(false));
+            //
+            position = Position.FromFEN("1rbqkbnr/pppppppp/2n5/7Q/4P3/8/PPPP1PPP/RNB1KBNR w KQk - 3 3");
+            Assert.False(position.IsKingInCheck(false));
+        }
+
+        [Fact]
+        public void GetAllLegalMoves_StartingPositionMoveCount()
+        {
+            Assert.Equal(20, Position.startingPosition.GetAllLegalMoves().Count);
+        }
+
+        [Fact]
+        public void GetAllLegalMoves_AccountsForCheck()
+        {
+            var position = Position.FromFEN("r1bqkbnr/pppppppp/2n5/7Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 2 2");
+            Assert.Equal(19, position.GetAllLegalMoves().Count);
         }
     }
 }

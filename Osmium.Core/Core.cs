@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.Design;
+using System.Net.Http.Headers;
+using System.Net.NetworkInformation;
 using System.Runtime.Intrinsics;
 
 namespace Osmium.Core
@@ -330,10 +332,10 @@ namespace Osmium.Core
             };
         }
 
-        static bool IsPawnCheckingKing(Vector2 pawn, bool pawnIsWhite, Vector2 king)
+        bool IsPawnCheckingKing(Vector2 pawn, bool pawnColor, Vector2 king)
         {
             Vector2 displacement = king - pawn;
-            Vector2 forward = pawnIsWhite ? Vector2.up : Vector2.down;
+            Vector2 forward = pawnColor ? Vector2.up : Vector2.down;
             return displacement == forward + Vector2.left || displacement == forward + Vector2.right;
         }
 
@@ -347,7 +349,7 @@ namespace Osmium.Core
             return RaycastForHitpoint(bishop, direction) == king;                
         }
 
-        static bool IsKnightCheckingKing(Vector2 knight, Vector2 king)
+        bool IsKnightCheckingKing(Vector2 knight, Vector2 king)
         {
             // again, we assume that the provided king location is correct
             Vector2 displacement = king - knight;
@@ -368,42 +370,155 @@ namespace Osmium.Core
             else return false;
         }
 
-        static bool IsKingCheckingKing(Vector2 attacker, Vector2 king)
+        bool IsKingCheckingKing(Vector2 attacker, Vector2 king)
         {
             // son 😭😭😭
             Vector2 displacement = king - attacker;
             return Math.Abs(displacement.rank) <= 1 && Math.Abs(displacement.file) <= 1;
         }
 
-        bool IsKingInCheck(bool kingColor)
+        public bool IsKingInCheck(bool kingColor)
         {
             // find king
-            Vector2 king = -Vector2.one;
-            Piece kingPiece = new(Piece.Type.King, kingColor);
-            for (int rank = kingColor ? 0 : 7; rank >= 0 && rank < 8; rank += kingColor ? 1 : -1)
-            {
-                for (int file = 0; file < 8; file++)
-                {
-                    Piece? piece = GetPiece(rank, file);
-                    if (piece is not null && piece == kingPiece)
-                        king = new(file, rank);
-                }
-            }
-            if (king == -Vector2.one)
+            var king = FindPiece(new(Piece.Type.King, kingColor));
+            if (king is null)
                 throw new Exception();
             //
             for (int rank = 0; rank < 8; rank++)
             {
-                for (int file = 0; file < rank; file++)
+                for (int file = 0; file < 8; file++)
                 {
                     Piece? piece = GetPiece(rank, file);
                     if (piece is null || piece.isWhite == kingColor)
                         continue; // nothing worth examining rn on this square
-                    if (IsPieceCheckingKing(new(rank, file), king))
+                    if (IsPieceCheckingKing(new(file, rank), king))
                         return true;
                 }
             }
             return false;
+        }
+
+        Vector2? FindPiece(Piece target)
+        {
+            Vector2 result;
+            int startRank = target.isWhite ? 0 : 7;
+            int rankIncrement = target.isWhite ? 1 : -1;
+            for (int rank = startRank; rank >= 0 && rank < 8; rank += rankIncrement)
+            {
+                for (int file = 0; file < 8; file++)
+                {
+                    Piece? piece = GetPiece(rank, file);
+                    if (piece is null || piece != target)
+                        continue;
+                    result = new(file, rank);
+                    return result;
+                }
+            }
+            return null;
+        }
+
+        List<Move> GetMovesAlongRay(Vector2 origin, Vector2 direction, bool attackerColor)
+        {
+            List<Move> result = [];
+            Vector2 pos = origin.DeepCopy();
+            while (true)
+            {
+                pos += direction;
+                if (!pos.IsInBounds())
+                    return result;
+                var piece = GetPiece(pos);
+                if (piece is null || piece.isWhite != attackerColor)
+                    result.Add(new(origin.DeepCopy(), pos.DeepCopy()));
+                if (piece is not null)
+                    return result;
+            }
+        }
+
+        public List<Move> GetAllLegalMoves()
+        {
+            List<Move> result = [];
+            // get all moves not acknowledging checks
+            for (int rank = 0; rank < 8; rank++)
+            {
+                for (int file = 0; file < 8; file++)
+                {
+                    var piece = GetPiece(rank, file);
+                    if (piece is null || piece.isWhite != whiteToMove)
+                        continue;
+                    result.AddRange(piece.type switch
+                    {
+                        Piece.Type.Pawn => GetPawnMoves(new(file, rank), whiteToMove),
+                        Piece.Type.Bishop => GetRiderMoves(new(file, rank), whiteToMove, Vector2.diagonalDirections),
+                        Piece.Type.Knight => GetLeaperMoves(new(file, rank), whiteToMove, Vector2.hippogonalDirections),
+                        Piece.Type.Rook => GetRiderMoves(new(file, rank), whiteToMove, Vector2.orthogonalDirections),
+                        Piece.Type.Queen => GetRiderMoves(new(file, rank), whiteToMove, Vector2.allDirections),
+                        Piece.Type.King => GetLeaperMoves(new(file, rank), whiteToMove, Vector2.allDirections),
+                        _ => throw new Exception()
+                    });
+                }
+            }
+            // filter out every move that'd leave the king in check
+            for (int i = result.Count - 1; i >= 0; i--)
+            {
+                var move = result[i].DeepCopy();
+                var positionAfterMove = this.DeepCopy();
+                positionAfterMove.MakeMove(move);
+                if (positionAfterMove.IsKingInCheck(whiteToMove))
+                    result.RemoveAt(i);
+            }
+            //
+            return result;
+        }
+
+        List<Move> GetPawnMoves(Vector2 pawn, bool pawnColor)
+        {
+            List<Move> result = [];
+            Vector2 forward = pawnColor ? Vector2.up : Vector2.down;
+            // push 1 square forward
+            if (GetPiece(pawn + forward) is null)
+            {
+                result.Add(new(pawn, pawn + forward));
+                // push 2 squares forward
+                if (pawn.rank == (pawnColor ? 1 : 6) && GetPiece(pawn + forward + forward) is null)
+                    result.Add(new(pawn, pawn + forward + forward));
+            }
+            // captures
+            if ((pawn + forward + Vector2.left).IsInBounds())
+            {
+                var leftCapturePiece = GetPiece(pawn + forward + Vector2.left);
+                if ((leftCapturePiece is not null && leftCapturePiece.isWhite != pawnColor) || (enPassantSquare is not null && enPassantSquare == pawn + forward + Vector2.left))
+                    result.Add(new(pawn, pawn + forward + Vector2.left));
+            }
+            if ((pawn + forward + Vector2.right).IsInBounds())
+            {
+                var rightCapturePiece = GetPiece(pawn + forward + Vector2.right);
+                if ((rightCapturePiece is not null && rightCapturePiece.isWhite != pawnColor) || (enPassantSquare is not null && enPassantSquare == pawn + forward + Vector2.right))
+                    result.Add(new(pawn, pawn + forward + Vector2.left));
+            }
+            //
+            return result;
+        }
+
+        List<Move> GetRiderMoves(Vector2 rider, bool riderColor, Vector2[] directions) // generalized method for rooks, bishops and queens
+        {
+            List<Move> result = [];
+            foreach (var direction in directions)
+                result.AddRange(GetMovesAlongRay(rider, direction, riderColor));
+            return result;
+        }
+
+        List<Move> GetLeaperMoves(Vector2 leaper, bool leaperColor, Vector2[] directions) // generalized method for knights and kings
+        {
+            List<Move> result = [];
+            foreach (var direction in directions)
+            {
+                if (!(leaper + direction).IsInBounds())
+                    continue;
+                var piece = GetPiece(leaper + direction);
+                if (piece is null || piece.isWhite != leaperColor)
+                    result.Add(new(leaper, leaper + direction));
+            }
+            return result;
         }
     }
 
@@ -416,5 +531,8 @@ namespace Osmium.Core
             from = p_from;
             to = p_to;
         }
+
+        public Move DeepCopy()
+            => new(from.DeepCopy(), to.DeepCopy());
     }
 }
