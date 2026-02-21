@@ -330,7 +330,7 @@ namespace Osmium.Core
             };
         }
 
-        bool IsPawnCheckingKing(Vector2 pawn, bool pawnIsWhite, Vector2 king)
+        static bool IsPawnCheckingKing(Vector2 pawn, bool pawnIsWhite, Vector2 king)
         {
             Vector2 displacement = king - pawn;
             Vector2 forward = pawnIsWhite ? Vector2.up : Vector2.down;
@@ -347,7 +347,7 @@ namespace Osmium.Core
             return RaycastForHitpoint(bishop, direction) == king;                
         }
 
-        bool IsKnightCheckingKing(Vector2 knight, Vector2 king)
+        static bool IsKnightCheckingKing(Vector2 knight, Vector2 king)
         {
             // again, we assume that the provided king location is correct
             Vector2 displacement = king - knight;
@@ -368,7 +368,7 @@ namespace Osmium.Core
             else return false;
         }
 
-        bool IsKingCheckingKing(Vector2 attacker, Vector2 king)
+        static bool IsKingCheckingKing(Vector2 attacker, Vector2 king)
         {
             // son 😭😭😭
             Vector2 displacement = king - attacker;
