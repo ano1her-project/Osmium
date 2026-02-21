@@ -1,13 +1,14 @@
 ﻿using System.ComponentModel.Design;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Net.NetworkInformation;
 using System.Runtime.Intrinsics;
 
 namespace Osmium.Core
 {
-    public class Vector2
+    public readonly struct Vector2
     {
-        public int file, rank; // which file = x, which rank = y
+        public readonly int file, rank; // which file = x, which rank = y
 
         public Vector2(int p_file, int p_rank)
         {
@@ -26,6 +27,18 @@ namespace Osmium.Core
         public static readonly Vector2[] allDirections = [up, one, right, right + down, down, -one, left, left + up];
         public static readonly Vector2[] hippogonalDirections = [new(1, 2), new(2, 1), new(2, -1), new(1, -2), new(-1, -2), new(-2, -1), new(-2, 1), new(-1, 2)];
 
+        public override bool Equals(object? obj)
+            => obj is Vector2 v && this == v;
+
+        public static bool operator ==(Vector2 a, Vector2 b)
+            => a.file == b.file && a.rank == b.rank;
+
+        public static bool operator !=(Vector2 a, Vector2 b)
+            => !(a == b);
+
+        public override int GetHashCode()
+            => HashCode.Combine(rank, file);
+
         public static Vector2 operator -(Vector2 v)
             => new(-v.file, -v.rank);
 
@@ -35,16 +48,7 @@ namespace Osmium.Core
         public static Vector2 operator -(Vector2 a, Vector2 b)
             => new(a.file - b.file, a.rank - b.rank);
 
-        public static bool operator ==(Vector2 a, Vector2 b)
-            => a.file == b.file && a.rank == b.rank;
-
-        public static bool operator !=(Vector2 a, Vector2 b)
-            => !(a == b);
-
-        public Vector2 DeepCopy()
-            => new(file, rank);
-
-        public static Vector2 FromString(string str) // assuming a string in the format of e4 (for example)
+        public static Vector2 FromString(string str) // assuming a string in the format of, for instance, e4
             => new(str[0] - 'a', str[1] - '0' - 1);
 
         public override string ToString()
@@ -54,10 +58,10 @@ namespace Osmium.Core
             => rank >= 0 && rank < 8 && file >= 0 && file < 8;
     }
 
-    public class Piece
+    public readonly struct Piece
     {
-        public Type type;
-        public bool isWhite;
+        public readonly Type type;
+        public readonly bool isWhite;
 
         public enum Type
         {
@@ -90,11 +94,17 @@ namespace Osmium.Core
             };
         }
 
+        public override bool Equals(object? obj)
+            => obj is Piece piece && this == piece;
+
         public static bool operator ==(Piece a, Piece b)
             => a.type == b.type && a.isWhite == b.isWhite;
 
         public static bool operator !=(Piece a, Piece b)
             => !(a == b);
+
+        public override int GetHashCode()
+            => HashCode.Combine(type, isWhite);
 
         public char ToChar()
         {
@@ -114,8 +124,8 @@ namespace Osmium.Core
         public override string ToString()
             => ToChar().ToString();
 
-        public Piece DeepCopy()
-            => new(type, isWhite);
+        public Piece GetInverted() // only used in the PrettyPrinter when inverting colors
+            => new(type, !isWhite); 
     }
 
     public class Position
@@ -214,11 +224,11 @@ namespace Osmium.Core
             for (int rank = 0; rank < 8; rank++)
             {
                 for (int file = 0; file < 8; file++)
-                    newBoard[rank, file] = GetPiece(rank, file)?.DeepCopy();
+                    newBoard[rank, file] = GetPiece(rank, file);
             }
             bool newWhiteToMove = whiteToMove;
             var newCastlingAvailability = castlingAvailability;
-            Vector2? newEnPassantSquare = enPassantSquare is null ? null : enPassantSquare.DeepCopy();
+            Vector2? newEnPassantSquare = enPassantSquare is null ? null : enPassantSquare;
             int newHalfmoveClock = halfmoveClock;
             int newFullmoves = fullmoves;
             return new(newBoard, newWhiteToMove, newCastlingAvailability, newEnPassantSquare, newHalfmoveClock, newFullmoves);
@@ -243,6 +253,7 @@ namespace Osmium.Core
                         if (consecutiveEmptySquares != 0)
                             output += consecutiveEmptySquares.ToString();
                         output += GetPiece(rank, file)?.ToString();
+                        consecutiveEmptySquares = 0;
                     }
                 }
                 output += consecutiveEmptySquares == 0 ? "" : consecutiveEmptySquares.ToString();
@@ -269,7 +280,7 @@ namespace Osmium.Core
             => GetPiece(v.rank, v.file);
 
         public void SetPiece(int rank, int file, Piece? piece)
-            => board[rank, file] = piece is null ? null : piece.DeepCopy();
+            => board[rank, file] = piece;
 
         public void SetPiece(Vector2 v, Piece? piece)
             => SetPiece(v.rank, v.file, piece);
@@ -278,7 +289,7 @@ namespace Osmium.Core
         {
             var piece = GetPiece(move.from);
             if (piece is null)
-                return; // just pack it up man
+                throw new Exception();
             SetPiece(move.from, null);
             SetPiece(move.to, piece);
         }
@@ -287,7 +298,7 @@ namespace Osmium.Core
 
         public Piece? Raycast(Vector2 origin, Vector2 direction)
         {
-            Vector2 pos = origin.DeepCopy();
+            Vector2 pos = origin;
             while (true)
             {
                 pos += direction;
@@ -295,13 +306,13 @@ namespace Osmium.Core
                     return null;
                 var piece = GetPiece(pos);
                 if (piece is not null)
-                    return piece.DeepCopy();
+                    return piece;
             }
         }
 
         public Vector2? RaycastForHitpoint(Vector2 origin, Vector2 direction)
         {
-            Vector2 pos = origin.DeepCopy();
+            Vector2 pos = origin;
             while (true)
             {
                 pos += direction;
@@ -319,10 +330,10 @@ namespace Osmium.Core
             var piece = GetPiece(attacker.rank, attacker.file);
             if (piece is null)
                 return false;
-            return piece.type switch
+            return piece?.type switch
             {
                 // son 😭😭😭 im crine 😭😭😭 this is NOT good code 😭😭😭
-                Piece.Type.Pawn => IsPawnCheckingKing(attacker, piece.isWhite, king),
+                Piece.Type.Pawn => IsPawnCheckingKing(attacker, (bool)piece?.isWhite, king),
                 Piece.Type.Bishop => IsBishopCheckingKing(attacker, king),
                 Piece.Type.Knight => IsKnightCheckingKing(attacker, king),
                 Piece.Type.Rook => IsRookCheckingKing(attacker, king),
@@ -380,16 +391,14 @@ namespace Osmium.Core
         public bool IsKingInCheck(bool kingColor)
         {
             // find king
-            var king = FindPiece(new(Piece.Type.King, kingColor));
-            if (king is null)
-                throw new Exception();
+            var king = FindPiece(new(Piece.Type.King, kingColor)) ?? throw new Exception();
             //
             for (int rank = 0; rank < 8; rank++)
             {
                 for (int file = 0; file < 8; file++)
                 {
                     Piece? piece = GetPiece(rank, file);
-                    if (piece is null || piece.isWhite == kingColor)
+                    if (piece is null || (bool)piece?.isWhite == kingColor)
                         continue; // nothing worth examining rn on this square
                     if (IsPieceCheckingKing(new(file, rank), king))
                         return true;
@@ -420,15 +429,15 @@ namespace Osmium.Core
         List<Move> GetMovesAlongRay(Vector2 origin, Vector2 direction, bool attackerColor)
         {
             List<Move> result = [];
-            Vector2 pos = origin.DeepCopy();
+            Vector2 pos = origin;
             while (true)
             {
                 pos += direction;
                 if (!pos.IsInBounds())
                     return result;
                 var piece = GetPiece(pos);
-                if (piece is null || piece.isWhite != attackerColor)
-                    result.Add(new(origin.DeepCopy(), pos.DeepCopy()));
+                if (piece is null || piece?.isWhite != attackerColor)
+                    result.Add(new(origin, pos));
                 if (piece is not null)
                     return result;
             }
@@ -443,9 +452,9 @@ namespace Osmium.Core
                 for (int file = 0; file < 8; file++)
                 {
                     var piece = GetPiece(rank, file);
-                    if (piece is null || piece.isWhite != whiteToMove)
+                    if (piece is null || piece?.isWhite != whiteToMove)
                         continue;
-                    result.AddRange(piece.type switch
+                    result.AddRange(piece?.type switch
                     {
                         Piece.Type.Pawn => GetPawnMoves(new(file, rank), whiteToMove),
                         Piece.Type.Bishop => GetRiderMoves(new(file, rank), whiteToMove, Vector2.diagonalDirections),
@@ -460,9 +469,8 @@ namespace Osmium.Core
             // filter out every move that'd leave the king in check
             for (int i = result.Count - 1; i >= 0; i--)
             {
-                var move = result[i].DeepCopy();
                 var positionAfterMove = this.DeepCopy();
-                positionAfterMove.MakeMove(move);
+                positionAfterMove.MakeMove(result[i]);
                 if (positionAfterMove.IsKingInCheck(whiteToMove))
                     result.RemoveAt(i);
             }
@@ -486,13 +494,13 @@ namespace Osmium.Core
             if ((pawn + forward + Vector2.left).IsInBounds())
             {
                 var leftCapturePiece = GetPiece(pawn + forward + Vector2.left);
-                if ((leftCapturePiece is not null && leftCapturePiece.isWhite != pawnColor) || (enPassantSquare is not null && enPassantSquare == pawn + forward + Vector2.left))
+                if ((leftCapturePiece is not null && leftCapturePiece?.isWhite != pawnColor) || (enPassantSquare is not null && enPassantSquare == pawn + forward + Vector2.left))
                     result.Add(new(pawn, pawn + forward + Vector2.left));
             }
             if ((pawn + forward + Vector2.right).IsInBounds())
             {
                 var rightCapturePiece = GetPiece(pawn + forward + Vector2.right);
-                if ((rightCapturePiece is not null && rightCapturePiece.isWhite != pawnColor) || (enPassantSquare is not null && enPassantSquare == pawn + forward + Vector2.right))
+                if ((rightCapturePiece is not null && rightCapturePiece?.isWhite != pawnColor) || (enPassantSquare is not null && enPassantSquare == pawn + forward + Vector2.right))
                     result.Add(new(pawn, pawn + forward + Vector2.left));
             }
             //
@@ -515,24 +523,21 @@ namespace Osmium.Core
                 if (!(leaper + direction).IsInBounds())
                     continue;
                 var piece = GetPiece(leaper + direction);
-                if (piece is null || piece.isWhite != leaperColor)
+                if (piece is null || piece?.isWhite != leaperColor)
                     result.Add(new(leaper, leaper + direction));
             }
             return result;
         }
     }
 
-    public class Move
+    public readonly struct Move
     {
-        public Vector2 from, to;
+        public readonly Vector2 from, to;
 
         public Move(Vector2 p_from, Vector2 p_to)
         {
             from = p_from;
             to = p_to;
         }
-
-        public Move DeepCopy()
-            => new(from.DeepCopy(), to.DeepCopy());
     }
 }

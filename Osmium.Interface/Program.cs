@@ -72,8 +72,8 @@ namespace Osmium.Interface
                         output += "." + pieceOptions switch
                         {
                             PieceOptions.Ascii => position.GetPiece(rank, file)?.ToString(),
-                            PieceOptions.Unicode => unicodePieces[position.GetPiece(rank, file).ToChar()],
-                            PieceOptions.UnicodeInverted => unicodePieces[new Piece(position.GetPiece(rank, file).type, !position.GetPiece(rank, file).isWhite).ToChar()],
+                            PieceOptions.Unicode => unicodePieces[(char)position.GetPiece(rank, file)?.ToChar()],
+                            PieceOptions.UnicodeInverted => unicodePieces[(char)position.GetPiece(rank, file)?.GetInverted().ToChar()],
                             _ => throw new Exception()
                         };
                 }
