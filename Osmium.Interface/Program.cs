@@ -6,6 +6,8 @@ namespace Osmium.Interface
     {
         static void Main()
         {
+            PrettyPrinter.Print(Position.startingPosition);
+            PrettyPrinter.Print(Position.FromFEN("k7/8/8/8/8/8/8/R6K w - - 0 1"));
             PregameLoop();
         }
 
@@ -52,11 +54,12 @@ namespace Osmium.Interface
             ShadedInverted
         }
 
-        public static void PrintPosition(Position position, PieceOptions pieceOptions, BackgroundOptions backgroundOptions)
+        public static void Print(Position position, PieceOptions pieceOptions, BackgroundOptions backgroundOptions)
         {
             string output = "";
             for (int rank = 7; rank >= 0; rank--)
             {
+                output += (rank + 1).ToString() + " ";
                 for (int file = 0; file < 8; file++)
                 {
                     if (position.GetPiece(rank, file) is null)
@@ -76,10 +79,14 @@ namespace Osmium.Interface
                             _ => throw new Exception()
                         };
                 }
-                output += rank > 0 ? "\n" : "";
+                output += "\n";
             }
+            output += "  a b c d e f g h ";
             Console.WriteLine(output);
         }
+
+        public static void Print(Position position)
+            => Print(position, PieceOptions.Ascii, BackgroundOptions.ShadedInverted);
 
         static bool IsSquareWhite(int rank, int file)
             => (rank + file) % 2 != 0;

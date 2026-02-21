@@ -1,4 +1,5 @@
 ﻿using Osmium.Core;
+using System.Runtime.Intrinsics;
 
 namespace Osmium.Tests
 {
@@ -77,6 +78,39 @@ namespace Osmium.Tests
         public void StartingPositionToFen()
         {
             Assert.Equal("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", Position.startingPosition.ToFEN());
+        }
+
+        [Fact]
+        public void Raycast_RookSample()
+        {
+            var position = Position.FromFEN("k7/8/8/8/8/8/8/R6K w - - 0 1");
+            Vector2 attacker = new(0, 0);
+            Assert.Equal("R", position.GetPiece(0, 0).ToString());
+            //
+            Assert.Equal("k", position.Raycast(attacker, Vector2.up).ToString());
+            Assert.True(position.Raycast(attacker, Vector2.up) == new Piece(Piece.Type.King, false));
+            // de facto two ways of expressing the same thing
+        }
+
+        [Fact]
+        public void Raycast_BishopSample()
+        {
+            var position = Position.FromFEN("7k/8/8/8/8/8/8/B6K w - - 0 1");
+            Vector2 attacker = new(0, 0);
+            Assert.Equal("B", position.GetPiece(0, 0).ToString());
+            //
+            Assert.Equal("k", position.Raycast(attacker, Vector2.one).ToString());
+            Assert.True(position.Raycast(attacker, Vector2.one) == new Piece(Piece.Type.King, false));
+            // de facto two ways of expressing the same thing
+        }
+
+        [Fact]
+        public void Raycast_WallHit()
+        {
+            var position = Position.FromFEN("8/8/8/8/8/8/8/8 w - - 0 1");
+            Vector2 origin = new(1, 1);
+            foreach (var direction in Vector2.allDirections)
+                Assert.True(position.Raycast(origin, direction) is null);
         }
     }
 }

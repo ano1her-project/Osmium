@@ -1,4 +1,7 @@
-﻿namespace Osmium.Core
+﻿using System.ComponentModel.Design;
+using System.Runtime.Intrinsics;
+
+namespace Osmium.Core
 {
     public class Vector2
     {
@@ -14,11 +17,15 @@
         public static readonly Vector2 right = new(1, 0);
         public static readonly Vector2 down = new(0, -1);
         public static readonly Vector2 left = new(-1, 0);
+        public static readonly Vector2 one = new(1, 1);
 
         public static readonly Vector2[] orthogonalDirections = [up, right, down, left];
-        public static readonly Vector2[] diagonalDirections = [up + right, right + down, down + left, left + up];
-        public static readonly Vector2[] allDirections = [up, up + right, right, right + down, down, down + left, left, left + up];
+        public static readonly Vector2[] diagonalDirections = [one, right + down, -one, left + up];
+        public static readonly Vector2[] allDirections = [up, one, right, right + down, down, -one, left, left + up];
         public static readonly Vector2[] hippogonalDirections = [new(1, 2), new(2, 1), new(2, -1), new(1, -2), new(-1, -2), new(-2, -1), new(-2, 1), new(-1, 2)];
+
+        public static Vector2 operator -(Vector2 v)
+            => new(-v.file, -v.rank);
 
         public static Vector2 operator +(Vector2 a, Vector2 b)
             => new(a.file + b.file, a.rank + b.rank);
@@ -40,6 +47,9 @@
 
         public override string ToString()
             => (char)('a' + file) + (rank + 1).ToString();
+
+        public bool IsInBounds()
+            => rank >= 0 && rank < 8 && file >= 0 && file < 8;
     }
 
     public class Piece
@@ -115,7 +125,8 @@
         int halfmoveClock;
         int fullmoves;
 
-        [Flags] public enum CastlingAvailability : byte
+        [Flags]
+        public enum CastlingAvailability : byte
         {
             None = 0,
             WhiteKingside = 1,
@@ -167,10 +178,10 @@
             // 0th (1st) field = piece placement data
             Piece?[,] board = new Piece?[8, 8];
             var ranks = fields[0].Split('/');
-            for (int rank = 0; rank < 8; rank++)
+            for (int rank = 7; rank >= 0; rank--)
             {
                 int file = 0;
-                foreach (var ch in ranks[rank].ToCharArray())
+                foreach (var ch in ranks[7 - rank].ToCharArray())
                 {
                     if (char.IsDigit(ch))
                         file += ch - '0'; // effectively converts ch to an int
@@ -218,7 +229,7 @@
         {
             string output = "";
             // 0th (1st) field = piece placement data
-            for (int rank = 0; rank < 8; rank++)
+            for (int rank = 7; rank >= 0; rank--)
             {
                 int consecutiveEmptySquares = 0;
                 for (int file = 0; file < 8; file++)
@@ -233,7 +244,7 @@
                     }
                 }
                 output += consecutiveEmptySquares == 0 ? "" : consecutiveEmptySquares.ToString();
-                output += rank == 7 ? " " : "/";
+                output += rank == 0 ? " " : "/";
             }
             // 1st (2nd) field = active color
             output += (whiteToMove ? "w" : "b") + " ";
@@ -270,11 +281,98 @@
             SetPiece(move.to, piece);
         }
 
-        // move generation and move legality:
+        // move legality and move generation:
 
-        public bool IsPieceCheckingKing(int rank, int file)
+        public Piece? Raycast(Vector2 origin, Vector2 direction)
         {
-            var piece = GetPiece(rank, file);
+            Vector2 pos = origin.DeepCopy();
+            while (true)
+            {
+                pos += direction;
+                if (!pos.IsInBounds())
+                    return null;
+                var piece = GetPiece(pos);
+                if (piece is not null)
+                    return piece.DeepCopy();
+            }
+        }
+
+        public Vector2? RaycastForHitpoint(Vector2 origin, Vector2 direction)
+        {
+            Vector2 pos = origin.DeepCopy();
+            while (true)
+            {
+                pos += direction;
+                if (!pos.IsInBounds())
+                    return null;
+                var piece = GetPiece(pos);
+                if (piece is not null)
+                    return pos;
+            }
+        }
+
+        public bool IsPieceCheckingKing(Vector2 attacker, Vector2 king)
+        {
+            // we assume that the provided king location is correct
+            var piece = GetPiece(attacker.rank, attacker.file);
+            if (piece is null)
+                return false;
+            return piece.type switch
+            {
+                // son 😭😭😭 im crine 😭😭😭 this is NOT good code 😭😭😭
+                Piece.Type.Pawn => IsPawnCheckingKing(attacker, piece.isWhite, king),
+                Piece.Type.Bishop => IsBishopCheckingKing(attacker, king),
+                Piece.Type.Knight => IsKnightCheckingKing(attacker, king),
+                Piece.Type.Rook => IsRookCheckingKing(attacker, king),
+                Piece.Type.Queen => IsRookCheckingKing(attacker, king) || IsBishopCheckingKing(attacker, king),
+                Piece.Type.King => IsKingCheckingKing(attacker, king),
+                _ => throw new Exception()
+            };
+        }
+
+        bool IsPawnCheckingKing(Vector2 pawn, bool pawnIsWhite, Vector2 king)
+        {
+            Vector2 displacement = king - pawn;
+            Vector2 forward = pawnIsWhite ? Vector2.up : Vector2.down;
+            return displacement == forward + Vector2.left || displacement == forward + Vector2.right;
+        }
+
+        bool IsBishopCheckingKing(Vector2 bishop, Vector2 king)
+        {
+            // again, we assume that the provided king location is correct
+            Vector2 displacement = king - bishop;
+            if (Math.Abs(displacement.rank) != Math.Abs(displacement.file))
+                return false;
+            Vector2 direction = new(displacement.file > 0 ? 1 : -1, displacement.rank > 0 ? 1 : -1);
+            return RaycastForHitpoint(bishop, direction) == king;                
+        }
+
+        bool IsKnightCheckingKing(Vector2 knight, Vector2 king)
+        {
+            // again, we assume that the provided king location is correct
+            Vector2 displacement = king - knight;
+            if (Math.Abs(displacement.rank) == 2 && Math.Abs(displacement.file) == 1)
+                return true;
+            else if (Math.Abs(displacement.rank) == 1 && Math.Abs(displacement.file) == 2)
+                return true;
+            else return false;
+        }
+
+        bool IsRookCheckingKing(Vector2 rook, Vector2 king)
+        {
+            // again, we assume that the provided king location is correct
+            if (rook.rank == king.rank)
+                return RaycastForHitpoint(rook, (rook.file > king.file) ? Vector2.left : Vector2.right) == king;
+            else if (rook.file == king.file)
+                return RaycastForHitpoint(rook, (rook.rank > king.rank) ? Vector2.down : Vector2.up) == king;
+            else return false;
+        }
+
+        bool IsKingCheckingKing(Vector2 attacker, Vector2 king)
+        {
+            // son 😭😭😭
+            Vector2 displacement = king - attacker;
+            return Math.Abs(displacement.rank) <= 1 && Math.Abs(displacement.file) <= 1;
         }
     }
 
